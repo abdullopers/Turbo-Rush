@@ -996,8 +996,10 @@ function startWatchAd() {
         resetAdBtns();
       }
     }).catch(() => {
-      simulateAdView();
-    });
+  closeAdModal();
+  showToast('Нет доступной рекламы. Попробуйте позже.', 'error');
+  resetAdBtns();
+});
   } else {
     simulateAdView();
   }
