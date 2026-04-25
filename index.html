@@ -2,294 +2,376 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Turbo Rush</title>
+<meta name="description" content="Turbo Rush — гоняй, копи монеты и выводи в TON прямо из Telegram.">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap');
 
+  /* iOS / Telegram inspired blue & white theme */
   :root {
-    --bg: #0a0a0f;
-    --bg2: #111118;
-    --card: #16161f;
-    --border: #2a2a3d;
-    --accent: #ff4d00;
-    --accent2: #ff8c00;
-    --gold: #ffd700;
-    --green: #00e676;
-    --blue: #2979ff;
-    --text: #e8e8f0;
-    --muted: #666680;
-    --road: #1a1a2e;
+    --bg: #ffffff;
+    --bg2: #f2f4f8;
+    --card: #ffffff;
+    --card-alt: #f7f9fc;
+    --border: #e5e9f0;
+    --border-strong: #d6dde8;
+    --primary: #2481cc;        /* Telegram blue */
+    --primary-2: #1c6fb1;
+    --primary-soft: #e8f3fc;
+    --accent: #007aff;          /* iOS blue */
+    --success: #34c759;
+    --danger: #ff3b30;
+    --gold: #f5a623;
+    --text: #0b1220;
+    --text-2: #3c4858;
+    --muted: #8a94a6;
+    --shadow-sm: 0 1px 2px rgba(16,24,40,.06);
+    --shadow-md: 0 6px 18px rgba(36,129,204,.12);
+    --shadow-lg: 0 18px 40px rgba(36,129,204,.18);
+    --radius: 14px;
+    --radius-lg: 20px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bot: env(safe-area-inset-bottom, 0px);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-
+  html, body { height: 100%; }
   body {
-    font-family: 'Rajdhani', sans-serif;
-    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', system-ui, sans-serif;
+    background: var(--bg2);
     color: var(--text);
-    min-height: 100vh;
     overflow: hidden;
     user-select: none;
+    -webkit-user-select: none;
+    -webkit-font-smoothing: antialiased;
   }
+
+  /* iOS-feeling tap */
+  button, .tap { transition: transform .12s cubic-bezier(.4,0,.2,1), opacity .12s, background-color .15s; }
+  button:active, .tap:active { transform: scale(.97); opacity: .88; }
 
   /* ===== SCREENS ===== */
-  .screen { display: none; width: 100%; height: 100vh; position: absolute; top: 0; left: 0; overflow-y: auto; overflow-x: hidden; }
-  .screen.active { display: flex; flex-direction: column; }
-
-  /* ===== NAV ===== */
-  .nav-bar {
-    position: fixed; bottom: 0; left: 0; right: 0;
-    background: rgba(10,10,15,0.97);
-    border-top: 1px solid var(--border);
-    display: flex; z-index: 100;
-    backdrop-filter: blur(10px);
+  .screen {
+    display: none; position: absolute; inset: 0;
+    flex-direction: column;
+    overflow-y: auto; overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: calc(72px + var(--safe-bot));
+    background: var(--bg2);
   }
-  .nav-btn {
-    flex: 1; padding: 10px 4px 14px;
-    display: flex; flex-direction: column; align-items: center; gap: 3px;
-    cursor: pointer; transition: all .2s;
-    color: var(--muted); font-size: 10px; font-family: 'Rajdhani', sans-serif;
-    font-weight: 600; letter-spacing: .5px; text-transform: uppercase;
-    border: none; background: none;
-  }
-  .nav-btn.active { color: var(--accent); }
-  .nav-btn svg { width: 22px; height: 22px; transition: transform .2s; }
-  .nav-btn.active svg { transform: scale(1.15); }
+  .screen.active { display: flex; }
 
-  /* ===== TOP BAR ===== */
+  /* ===== TOP BAR (profile + coins) ===== */
   .top-bar {
+    position: sticky; top: 0; z-index: 20;
     display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 16px 10px;
-    background: linear-gradient(180deg, rgba(255,77,0,.08) 0%, transparent 100%);
+    padding: calc(10px + var(--safe-top)) 14px 10px;
+    background: rgba(255,255,255,.86);
+    backdrop-filter: saturate(180%) blur(18px);
+    -webkit-backdrop-filter: saturate(180%) blur(18px);
     border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
   }
-  .top-bar .logo { font-family: 'Orbitron', sans-serif; font-size: 18px; font-weight: 900; letter-spacing: 2px; color: var(--accent); }
+  .profile {
+    display: flex; align-items: center; gap: 10px;
+    background: transparent; border: 0; cursor: pointer; padding: 4px 6px; border-radius: 12px;
+  }
+  .profile:active { background: var(--bg2); }
+  .avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), #4aa8ff);
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 15px; box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .profile-meta { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1; }
+  .profile-name { font-size: 14px; font-weight: 700; color: var(--text); max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .profile-id { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
   .coin-display {
     display: flex; align-items: center; gap: 6px;
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 20px; padding: 6px 14px;
+    background: var(--primary-soft);
+    border: 1px solid #cfe5f7;
+    border-radius: 999px; padding: 6px 12px;
+    color: var(--primary-2); font-weight: 700; font-size: 14px;
   }
-  .coin-icon { font-size: 16px; }
-  .coin-amount { font-family: 'Orbitron', sans-serif; font-size: 14px; font-weight: 700; color: var(--gold); }
+  .coin-display .ic { font-size: 14px; }
+
+  .screen-title {
+    padding: 18px 18px 6px;
+    font-size: 28px; font-weight: 800; letter-spacing: -.5px; color: var(--text);
+  }
+  .screen-sub { padding: 0 18px 14px; color: var(--muted); font-size: 14px; }
+
+  /* ===== NAV BAR ===== */
+  .nav-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    padding: 6px 6px calc(6px + var(--safe-bot));
+    background: rgba(255,255,255,.92);
+    backdrop-filter: saturate(180%) blur(18px);
+    -webkit-backdrop-filter: saturate(180%) blur(18px);
+    border-top: 1px solid var(--border);
+    display: flex; z-index: 100;
+  }
+  .nav-btn {
+    flex: 1; padding: 8px 4px;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    color: var(--muted); font-size: 11px; font-weight: 600;
+    border: none; background: transparent; cursor: pointer;
+    border-radius: 12px;
+  }
+  .nav-btn svg { width: 24px; height: 24px; }
+  .nav-btn.active { color: var(--primary); }
+  .nav-btn.active svg { transform: scale(1.05); }
 
   /* ===== GAME SCREEN ===== */
-  #gameScreen {
-    background: var(--bg);
-    flex-direction: column;
-  }
+  #gameScreen { padding-bottom: calc(72px + var(--safe-bot)); }
   .game-ui-top {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 10px 16px; flex-shrink: 0;
+    display: flex; gap: 10px; padding: 12px 14px 6px;
   }
-  .stat-box {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 10px; padding: 6px 12px; text-align: center;
+  .stat-pill {
+    flex: 1; background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 8px 10px; text-align: center; box-shadow: var(--shadow-sm);
   }
-  .stat-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
-  .stat-value { font-family: 'Orbitron', sans-serif; font-size: 16px; font-weight: 700; color: var(--accent); }
+  .stat-label { font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+  .stat-value { font-size: 18px; font-weight: 800; color: var(--text); margin-top: 2px; }
   .stat-value.gold { color: var(--gold); }
+  .stat-value.blue { color: var(--primary); }
 
   #gameCanvas {
-    display: block;
-    flex-shrink: 0;
-    touch-action: none;
+    display: block; flex-shrink: 0; touch-action: none;
+    background: #eaf1f8; margin: 6px auto 0; border-radius: 16px;
+    box-shadow: var(--shadow-md);
   }
 
   .game-controls {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 10px 24px 10px; flex-shrink: 0;
+    padding: 10px 24px; gap: 12px;
   }
   .ctrl-btn {
-    width: 72px; height: 72px; border-radius: 50%;
-    border: 2px solid var(--border);
-    background: rgba(255,255,255,.05);
+    width: 76px; height: 76px; border-radius: 50%;
+    border: 1px solid var(--border); background: var(--card);
     display: flex; align-items: center; justify-content: center;
-    font-size: 28px; cursor: pointer; transition: all .1s;
-    -webkit-tap-highlight-color: transparent;
+    font-size: 28px; color: var(--primary); box-shadow: var(--shadow-md);
   }
-  .ctrl-btn:active { background: rgba(255,77,0,.2); border-color: var(--accent); transform: scale(.92); }
-  .ctrl-center { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-  .speed-bar-container { width: 80px; }
-  .speed-label { font-size: 9px; color: var(--muted); text-align: center; text-transform: uppercase; letter-spacing: 1px; }
-  .speed-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
-  .speed-fill { height: 100%; background: linear-gradient(90deg, var(--green), var(--accent2)); border-radius: 3px; transition: width .1s; }
+  .ctrl-btn:active { background: var(--primary-soft); transform: scale(.92); }
+  .ctrl-center { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .speed-bar { width: 110px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .speed-fill { height: 100%; background: linear-gradient(90deg, var(--primary), #66c2ff); border-radius: 3px; transition: width .15s; }
+  .mute-btn {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--card); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-2); font-size: 16px;
+  }
 
   /* ===== OVERLAY ===== */
   .overlay {
     position: absolute; inset: 0; z-index: 50;
-    background: rgba(0,0,0,.85);
+    background: rgba(255,255,255,.78);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 20px; padding: 24px;
-    backdrop-filter: blur(4px);
+    gap: 18px; padding: 24px;
   }
-  .overlay h2 { font-family: 'Orbitron', sans-serif; font-size: 28px; font-weight: 900; }
-  .overlay h2.red { color: var(--accent); }
-  .overlay h2.green { color: var(--green); }
+  .overlay h2 { font-size: 30px; font-weight: 800; letter-spacing: -.5px; }
+  .overlay h2.red { color: var(--danger); }
   .overlay-card {
     background: var(--card); border: 1px solid var(--border);
-    border-radius: 16px; padding: 20px 32px; text-align: center; width: 100%; max-width: 300px;
+    border-radius: var(--radius-lg); padding: 18px 22px; width: 100%; max-width: 320px;
+    box-shadow: var(--shadow-md);
   }
-  .overlay-stat { display: flex; justify-content: space-between; margin: 8px 0; font-size: 15px; }
-  .overlay-stat span:last-child { font-family: 'Orbitron', sans-serif; font-weight: 700; color: var(--gold); }
+  .overlay-stat { display: flex; justify-content: space-between; padding: 8px 0; font-size: 15px; color: var(--text-2); border-bottom: 1px solid var(--border); }
+  .overlay-stat:last-child { border-bottom: 0; }
+  .overlay-stat span:last-child { font-weight: 800; color: var(--text); }
 
   /* ===== BUTTONS ===== */
   .btn {
-    padding: 14px 28px; border-radius: 12px; border: none;
-    font-family: 'Orbitron', sans-serif; font-size: 13px; font-weight: 700;
-    letter-spacing: 1px; cursor: pointer; transition: all .15s;
-    width: 100%; max-width: 300px;
+    padding: 14px 18px; border-radius: 14px; border: none;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    width: 100%; max-width: 360px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   }
-  .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
-  .btn-primary:active { transform: scale(.97); opacity: .9; }
+  .btn-primary { background: linear-gradient(180deg, var(--primary), var(--primary-2)); color: #fff; box-shadow: 0 8px 22px rgba(36,129,204,.35); }
+  .btn-primary:active { box-shadow: 0 4px 12px rgba(36,129,204,.30); }
   .btn-secondary { background: var(--card); border: 1px solid var(--border); color: var(--text); }
-  .btn-secondary:active { opacity: .8; }
-  .btn-gold { background: linear-gradient(135deg, #b8860b, var(--gold)); color: #000; }
-  .btn-green { background: linear-gradient(135deg, #00b248, var(--green)); color: #000; }
-  .btn-blue { background: linear-gradient(135deg, var(--blue), #00b0ff); color: #fff; }
-  .btn-disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
-  .btn-sm { padding: 10px 20px; font-size: 11px; }
+  .btn-success { background: linear-gradient(180deg, var(--success), #2bb24d); color: #fff; box-shadow: 0 8px 22px rgba(52,199,89,.30); }
+  .btn-ghost { background: transparent; color: var(--primary); }
+  .btn-disabled { background: var(--bg2); color: var(--muted); cursor: not-allowed; box-shadow: none; }
+  .btn-sm { padding: 9px 14px; font-size: 13px; border-radius: 10px; width: auto; }
 
-  /* ===== SHOP SCREEN ===== */
-  #shopScreen { padding-bottom: 80px; }
-  .screen-title {
-    font-family: 'Orbitron', sans-serif; font-size: 20px; font-weight: 900;
-    padding: 16px; letter-spacing: 2px;
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
+  /* ===== CARDS ===== */
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 16px;
+    box-shadow: var(--shadow-sm);
   }
-  .screen-title span { color: var(--accent); }
+  .list { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); }
+  .list-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .list-row:last-child { border-bottom: 0; }
+  .list-row .ic-wrap { width: 36px; height: 36px; border-radius: 10px; background: var(--primary-soft); color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .list-row .lr-main { flex: 1; min-width: 0; }
+  .list-row .lr-title { font-weight: 700; font-size: 14px; color: var(--text); }
+  .list-row .lr-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .list-row .lr-right { font-weight: 700; font-size: 14px; }
+  .empty {
+    text-align: center; padding: 28px 16px; color: var(--muted); font-size: 14px;
+    background: var(--card); border: 1px dashed var(--border-strong); border-radius: var(--radius-lg);
+  }
 
-  .cars-grid {
-    padding: 12px;
-    display: flex; flex-direction: column; gap: 12px;
-  }
+  /* ===== SHOP ===== */
+  .cars-grid { padding: 6px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
   .car-card {
     background: var(--card); border: 1px solid var(--border);
-    border-radius: 16px; padding: 14px 16px;
-    display: flex; align-items: center; gap: 14px;
-    transition: border-color .2s;
+    border-radius: var(--radius-lg); padding: 12px;
+    display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);
   }
-  .car-card.owned { border-color: var(--green); }
-  .car-card.selected { border-color: var(--accent); background: rgba(255,77,0,.06); }
-  .car-emoji { font-size: 42px; flex-shrink: 0; }
+  .car-card.selected { border-color: var(--primary); background: var(--primary-soft); }
+  .car-emoji { font-size: 38px; flex-shrink: 0; width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; border-radius: 14px; background: var(--bg2); }
   .car-info { flex: 1; min-width: 0; }
-  .car-name { font-family: 'Orbitron', sans-serif; font-size: 14px; font-weight: 700; margin-bottom: 4px; }
-  .car-stats { display: flex; gap: 10px; flex-wrap: wrap; }
-  .car-stat-badge {
-    font-size: 10px; padding: 2px 7px; border-radius: 6px;
-    background: var(--bg2); border: 1px solid var(--border);
-    color: var(--muted);
-  }
-  .car-stat-badge span { color: var(--text); font-weight: 700; }
-  .car-price { font-family: 'Orbitron', sans-serif; font-size: 13px; color: var(--gold); font-weight: 700; white-space: nowrap; }
-  .car-action { flex-shrink: 0; }
-  .badge-owned { background: rgba(0,230,118,.15); border: 1px solid var(--green); color: var(--green); border-radius: 8px; padding: 6px 10px; font-size: 11px; font-weight: 700; }
-  .badge-selected { background: rgba(255,77,0,.15); border: 1px solid var(--accent); color: var(--accent); border-radius: 8px; padding: 6px 10px; font-size: 11px; font-weight: 700; }
+  .car-name { font-size: 15px; font-weight: 700; }
+  .car-stats { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 5px; }
+  .car-stat-badge { font-size: 11px; padding: 3px 7px; border-radius: 6px; background: var(--bg2); color: var(--text-2); }
+  .car-stat-badge b { color: var(--primary); }
+  .car-price { font-size: 13px; color: var(--gold); font-weight: 700; margin-top: 4px; }
+  .badge-selected { background: var(--primary); color: #fff; border-radius: 8px; padding: 5px 9px; font-size: 11px; font-weight: 700; }
+  .badge-owned { background: var(--success); color: #fff; border-radius: 8px; padding: 5px 9px; font-size: 11px; font-weight: 700; }
 
-  /* ===== BONUS SCREEN ===== */
-  #bonusScreen { padding-bottom: 80px; }
-  .bonus-content { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
-  .bonus-card {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 16px; padding: 20px; text-align: center;
-  }
-  .bonus-card.ad-card { border-color: rgba(255,140,0,.4); }
-  .bonus-big-icon { font-size: 56px; margin-bottom: 8px; }
-  .bonus-title { font-family: 'Orbitron', sans-serif; font-size: 16px; font-weight: 700; margin-bottom: 6px; }
-  .bonus-desc { color: var(--muted); font-size: 13px; line-height: 1.5; margin-bottom: 14px; }
-  .bonus-reward { font-family: 'Orbitron', sans-serif; font-size: 22px; color: var(--gold); font-weight: 900; margin-bottom: 14px; }
-  .cooldown-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 10px; }
-  .cooldown-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 3px; transition: width 1s linear; }
-  .cooldown-text { font-size: 11px; color: var(--muted); margin-top: 5px; text-align: center; }
+  /* ===== BONUS ===== */
+  .bonus-content { padding: 6px 14px 14px; display: flex; flex-direction: column; gap: 12px; }
+  .bonus-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 16px; text-align: center; box-shadow: var(--shadow-sm); }
+  .bonus-big-icon { font-size: 44px; margin-bottom: 6px; }
+  .bonus-title { font-size: 16px; font-weight: 800; }
+  .bonus-desc { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 6px 0 12px; }
+  .bonus-reward { font-size: 22px; color: var(--primary); font-weight: 800; margin-bottom: 12px; }
+  .cooldown-text { font-size: 12px; color: var(--muted); margin-top: 8px; }
 
-  /* ===== WITHDRAWAL SCREEN ===== */
-  #withdrawScreen { padding-bottom: 80px; }
-  .withdraw-content { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  /* ===== WITHDRAW ===== */
+  .withdraw-content { padding: 6px 14px 14px; display: flex; flex-direction: column; gap: 12px; }
   .info-banner {
-    background: rgba(255,77,0,.08); border: 1px solid rgba(255,77,0,.3);
-    border-radius: 12px; padding: 14px 16px;
+    background: var(--primary-soft); border: 1px solid #cfe5f7;
+    border-radius: var(--radius-lg); padding: 12px 14px;
     display: flex; align-items: flex-start; gap: 10px;
-    font-size: 13px; line-height: 1.6; color: var(--text);
+    font-size: 13px; line-height: 1.5; color: var(--primary-2);
   }
-  .info-banner .icon { font-size: 20px; flex-shrink: 0; }
+  .info-banner .icon { font-size: 18px; flex-shrink: 0; }
+
+  .converter {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg);
+    padding: 14px; box-shadow: var(--shadow-sm);
+  }
+  .conv-title { font-size: 13px; color: var(--muted); font-weight: 600; margin-bottom: 10px; }
+  .conv-row { display: flex; align-items: center; gap: 10px; }
+  .conv-input {
+    flex: 1; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 14px; font-size: 18px; font-weight: 700; color: var(--text);
+    outline: none; -webkit-appearance: none;
+  }
+  .conv-input:focus { border-color: var(--primary); background: #fff; }
+  .conv-eq { color: var(--muted); font-size: 18px; font-weight: 700; }
+  .conv-out {
+    flex: 1; background: var(--primary-soft); border: 1px solid #cfe5f7; border-radius: 12px;
+    padding: 12px 14px; font-size: 18px; font-weight: 800; color: var(--primary-2);
+    display: flex; align-items: center; gap: 6px; justify-content: flex-end;
+  }
+  .ton-ic {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: #0098ea; color: #fff; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 800; box-shadow: var(--shadow-sm);
+  }
+  .conv-rate { font-size: 11px; color: var(--muted); margin-top: 8px; text-align: center; }
+
   .form-group { display: flex; flex-direction: column; gap: 6px; }
-  .form-label { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); font-weight: 600; }
-  .form-input, .form-select, .form-textarea {
+  .form-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; padding-left: 4px; }
+  .form-input, .form-textarea {
     background: var(--card); border: 1px solid var(--border);
-    border-radius: 10px; padding: 12px 14px;
-    color: var(--text); font-family: 'Rajdhani', sans-serif;
-    font-size: 15px; font-weight: 500; outline: none;
-    transition: border-color .2s;
+    border-radius: 12px; padding: 12px 14px;
+    color: var(--text); font-family: inherit; font-size: 15px; font-weight: 500; outline: none;
     -webkit-appearance: none;
   }
-  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent); }
-  .form-select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23666680' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
-  .form-textarea { resize: none; height: 90px; }
-  .balance-preview {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 12px; padding: 14px 16px;
-    display: flex; justify-content: space-between; align-items: center;
-  }
+  .form-input:focus, .form-textarea:focus { border-color: var(--primary); }
+  .form-textarea { resize: none; height: 80px; }
+
+  .balance-preview { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: var(--shadow-sm); }
   .balance-preview-label { font-size: 13px; color: var(--muted); }
-  .balance-preview-value { font-family: 'Orbitron', sans-serif; font-size: 20px; font-weight: 700; color: var(--gold); }
+  .balance-preview-value { font-size: 20px; font-weight: 800; color: var(--gold); }
+
+  .seg {
+    display: flex; padding: 4px; background: var(--bg2); border-radius: 12px; margin: 0 14px;
+  }
+  .seg button {
+    flex: 1; padding: 8px 10px; border: 0; background: transparent;
+    color: var(--text-2); font-weight: 600; font-size: 13px; border-radius: 10px;
+  }
+  .seg button.active { background: var(--card); color: var(--primary); box-shadow: var(--shadow-sm); }
 
   /* ===== TOAST ===== */
   .toast {
-    position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-80px);
+    position: fixed; top: calc(20px + var(--safe-top)); left: 50%;
+    transform: translateX(-50%) translateY(-100px);
     background: var(--card); border: 1px solid var(--border);
-    border-radius: 30px; padding: 10px 20px;
-    font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 600;
-    z-index: 999; transition: transform .3s ease;
-    white-space: nowrap; max-width: 280px; text-align: center;
+    border-radius: 999px; padding: 10px 18px;
+    font-size: 14px; font-weight: 600; color: var(--text);
+    z-index: 999; transition: transform .3s cubic-bezier(.4,0,.2,1);
+    box-shadow: var(--shadow-lg);
+    max-width: 86vw; text-align: center;
     pointer-events: none;
   }
   .toast.show { transform: translateX(-50%) translateY(0); }
-  .toast.success { border-color: var(--green); color: var(--green); }
-  .toast.error { border-color: var(--accent); color: var(--accent); }
-  .toast.info { border-color: var(--gold); color: var(--gold); }
+  .toast.success { border-color: rgba(52,199,89,.4); color: var(--success); }
+  .toast.error { border-color: rgba(255,59,48,.4); color: var(--danger); }
+  .toast.info { border-color: rgba(36,129,204,.4); color: var(--primary); }
 
-  /* ===== AD MODAL ===== */
+  /* ===== MODAL ===== */
   .modal-overlay {
     position: fixed; inset: 0; z-index: 200;
-    background: rgba(0,0,0,.9);
-    display: none; align-items: center; justify-content: center;
-    padding: 24px;
+    background: rgba(15,20,32,.45);
+    display: none; align-items: flex-end; justify-content: center;
+    padding: 14px;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   }
-  .modal-overlay.show { display: flex; }
+  .modal-overlay.show { display: flex; animation: fade .2s ease; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
   .modal-box {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 20px; padding: 28px 24px;
-    width: 100%; max-width: 320px; text-align: center;
+    background: var(--card); border-radius: 22px;
+    width: 100%; max-width: 420px; padding: 22px 20px calc(22px + var(--safe-bot));
+    text-align: center; box-shadow: var(--shadow-lg);
+    animation: slideUp .25s cubic-bezier(.2,.8,.2,1);
   }
-  .modal-icon { font-size: 60px; margin-bottom: 12px; }
-  .modal-title { font-family: 'Orbitron', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 8px; }
-  .modal-text { color: var(--muted); font-size: 14px; line-height: 1.6; margin-bottom: 20px; }
+  @keyframes slideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .modal-icon { font-size: 50px; margin-bottom: 10px; }
+  .modal-title { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+  .modal-text { color: var(--muted); font-size: 14px; line-height: 1.5; margin-bottom: 16px; }
   .modal-btns { display: flex; flex-direction: column; gap: 10px; }
-
-  /* Loading spinner */
   .spinner {
-    width: 40px; height: 40px; border: 3px solid var(--border);
-    border-top-color: var(--accent); border-radius: 50%;
-    animation: spin .8s linear infinite; margin: 16px auto;
+    width: 36px; height: 36px; border: 3px solid var(--border);
+    border-top-color: var(--primary); border-radius: 50%;
+    animation: spin .8s linear infinite; margin: 14px auto;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  /* Profile sheet */
+  #profileSheet .modal-box { text-align: left; }
+  .ph-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .ph-avatar { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), #4aa8ff); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 22px; overflow: hidden; }
+  .ph-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .ph-name { font-size: 17px; font-weight: 800; }
+  .ph-username { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .ph-info-row { display: flex; justify-content: space-between; padding: 12px 0; border-top: 1px solid var(--border); font-size: 14px; }
+  .ph-info-row .k { color: var(--muted); }
+  .ph-info-row .v { font-weight: 700; color: var(--text); }
+  .copy-btn { background: var(--primary-soft); color: var(--primary); padding: 4px 10px; border-radius: 8px; font-size: 12px; border: 0; font-weight: 700; }
+
+  ::-webkit-scrollbar { width: 0; height: 0; }
 </style>
 </head>
 <body>
 
-<!-- TOAST -->
 <div class="toast" id="toast"></div>
 
 <!-- AD MODAL -->
@@ -297,130 +379,166 @@
   <div class="modal-box">
     <div class="modal-icon" id="adModalIcon">📺</div>
     <div class="modal-title" id="adModalTitle">Реклама</div>
-    <div class="modal-text" id="adModalText">Посмотрите рекламу и получите монеты!</div>
+    <div class="modal-text" id="adModalText">Посмотрите рекламу до конца — получите монеты.</div>
     <div class="spinner" id="adSpinner" style="display:none"></div>
     <div class="modal-btns" id="adModalBtns">
-      <button class="btn btn-gold" onclick="startWatchAd()">▶ Смотреть рекламу</button>
-      <button class="btn btn-secondary btn-sm" onclick="closeAdModal()">Отмена</button>
+      <button class="btn btn-primary" onclick="startWatchAd()">▶ Смотреть рекламу</button>
+      <button class="btn btn-ghost" onclick="closeAdModal()">Отмена</button>
     </div>
+  </div>
+</div>
+
+<!-- PROFILE SHEET -->
+<div class="modal-overlay" id="profileSheet" onclick="if(event.target===this)closeProfile()">
+  <div class="modal-box">
+    <div class="ph-row">
+      <div class="ph-avatar" id="phAvatar">U</div>
+      <div>
+        <div class="ph-name" id="phName">Пользователь</div>
+        <div class="ph-username" id="phUsername">@—</div>
+      </div>
+    </div>
+    <div class="ph-info-row">
+      <span class="k">Telegram ID</span>
+      <span style="display:flex;gap:8px;align-items:center"><span class="v" id="phId">—</span><button class="copy-btn" onclick="copyTgId()">копировать</button></span>
+    </div>
+    <div class="ph-info-row">
+      <span class="k">Монет</span>
+      <span class="v" id="phCoins">0</span>
+    </div>
+    <div class="ph-info-row">
+      <span class="k">Рекорд</span>
+      <span class="v" id="phRecord">0</span>
+    </div>
+    <div class="ph-info-row">
+      <span class="k">Машин в гараже</span>
+      <span class="v" id="phCars">1</span>
+    </div>
+    <div style="margin-top:14px"><button class="btn btn-secondary" onclick="closeProfile()">Закрыть</button></div>
   </div>
 </div>
 
 <!-- ===== GAME SCREEN ===== -->
 <div class="screen active" id="gameScreen">
-  <div class="game-ui-top">
-    <div class="stat-box">
-      <div class="stat-label">Очки</div>
-      <div class="stat-value" id="scoreDisplay">0</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-label">Монеты</div>
-      <div class="stat-value gold" id="gameCoins">0</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-label">Рекорд</div>
-      <div class="stat-value" id="highscoreDisplay">0</div>
-    </div>
-  </div>
-  <canvas id="gameCanvas"></canvas>
-  <div class="game-controls">
-    <button class="ctrl-btn" id="btnLeft" ontouchstart="startLeft()" ontouchend="stopLeft()" onmousedown="startLeft()" onmouseup="stopLeft()">◀</button>
-    <div class="ctrl-center">
-      <div class="speed-bar-container">
-        <div class="speed-label">Скорость</div>
-        <div class="speed-bar"><div class="speed-fill" id="speedFill" style="width:0%"></div></div>
+  <div class="top-bar">
+    <button class="profile" onclick="openProfile()">
+      <div class="avatar" id="topAvatar">U</div>
+      <div class="profile-meta">
+        <div class="profile-name" id="topName">Гость</div>
+        <div class="profile-id" id="topId">tap для ID</div>
       </div>
-    </div>
-    <button class="ctrl-btn" id="btnRight" ontouchstart="startRight()" ontouchend="stopRight()" onmousedown="startRight()" onmouseup="stopRight()">▶</button>
-  </div>
-  <div style="padding:0 16px 80px" id="startOverlay">
-    <button class="btn btn-primary" onclick="startGame()">🏁 СТАРТ</button>
+    </button>
+    <div class="coin-display"><span class="ic">🪙</span><span id="gameCoinsTop">0</span></div>
   </div>
 
-  <!-- Game Over Overlay -->
+  <div class="game-ui-top">
+    <div class="stat-pill"><div class="stat-label">Очки</div><div class="stat-value blue" id="scoreDisplay">0</div></div>
+    <div class="stat-pill"><div class="stat-label">Монеты</div><div class="stat-value gold" id="gameCoins">0</div></div>
+    <div class="stat-pill"><div class="stat-label">Рекорд</div><div class="stat-value" id="highscoreDisplay">0</div></div>
+  </div>
+
+  <canvas id="gameCanvas"></canvas>
+
+  <div class="game-controls">
+    <button class="ctrl-btn" id="btnLeft" ontouchstart="startLeft()" ontouchend="stopLeft()" onmousedown="startLeft()" onmouseup="stopLeft()" onmouseleave="stopLeft()">◀</button>
+    <div class="ctrl-center">
+      <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Скорость</div>
+      <div class="speed-bar"><div class="speed-fill" id="speedFill" style="width:0%"></div></div>
+      <button class="mute-btn" onclick="toggleMute()" id="muteBtn" title="Звук">🔊</button>
+    </div>
+    <button class="ctrl-btn" id="btnRight" ontouchstart="startRight()" ontouchend="stopRight()" onmousedown="startRight()" onmouseup="stopRight()" onmouseleave="stopRight()">▶</button>
+  </div>
+
+  <div style="padding:6px 16px 0" id="startOverlay">
+    <button class="btn btn-primary" onclick="startGame()">🏁 Старт заезда</button>
+  </div>
+
   <div class="overlay" id="gameOverOverlay" style="display:none">
-    <h2 class="red">АВАРИЯ!</h2>
+    <h2 class="red">Авария</h2>
     <div class="overlay-card">
       <div class="overlay-stat"><span>Очки</span><span id="finalScore">0</span></div>
       <div class="overlay-stat"><span>Монеты</span><span id="finalCoins">+0</span></div>
       <div class="overlay-stat"><span>Рекорд</span><span id="finalHighscore">0</span></div>
     </div>
     <button class="btn btn-primary" onclick="startGame()">🔄 Ещё раз</button>
-    <button class="btn btn-secondary btn-sm" onclick="goToMainMenu()">← Меню</button>
+    <button class="btn btn-ghost" onclick="goToMainMenu()">Меню</button>
   </div>
 </div>
 
-<!-- ===== SHOP SCREEN ===== -->
+<!-- ===== SHOP ===== -->
 <div class="screen" id="shopScreen">
   <div class="top-bar">
-    <div class="logo">ГАРАЖ</div>
-    <div class="coin-display">
-      <span class="coin-icon">🪙</span>
-      <span class="coin-amount" id="shopCoins">0</span>
-    </div>
+    <button class="profile" onclick="openProfile()">
+      <div class="avatar" id="topAvatar2">U</div>
+      <div class="profile-meta"><div class="profile-name" id="topName2">Гость</div><div class="profile-id" id="topId2">tap для ID</div></div>
+    </button>
+    <div class="coin-display"><span class="ic">🪙</span><span id="shopCoins">0</span></div>
   </div>
-  <div class="screen-title">Выбери <span>машину</span></div>
+  <div class="screen-title">Гараж</div>
+  <div class="screen-sub">Выбери машину. Каждая со своими статами.</div>
   <div class="cars-grid" id="carsGrid"></div>
 </div>
 
-<!-- ===== BONUS SCREEN ===== -->
+<!-- ===== BONUS ===== -->
 <div class="screen" id="bonusScreen">
   <div class="top-bar">
-    <div class="logo">БОНУСЫ</div>
-    <div class="coin-display">
-      <span class="coin-icon">🪙</span>
-      <span class="coin-amount" id="bonusCoins">0</span>
-    </div>
+    <button class="profile" onclick="openProfile()">
+      <div class="avatar" id="topAvatar3">U</div>
+      <div class="profile-meta"><div class="profile-name" id="topName3">Гость</div><div class="profile-id" id="topId3">tap для ID</div></div>
+    </button>
+    <div class="coin-display"><span class="ic">🪙</span><span id="bonusCoins">0</span></div>
   </div>
+  <div class="screen-title">Бонусы</div>
+  <div class="screen-sub">Заходи каждый день и смотри рекламу — копи монеты.</div>
+
   <div class="bonus-content">
-    <!-- Daily Bonus -->
-    <div class="bonus-card" id="dailyCard">
+    <div class="bonus-card">
       <div class="bonus-big-icon">🎁</div>
       <div class="bonus-title">Ежедневный бонус</div>
-      <div class="bonus-desc">Возвращайся каждые 24 часа за наградой!</div>
+      <div class="bonus-desc">Стрик растёт — награда тоже.</div>
       <div class="bonus-reward" id="dailyRewardText">+100 🪙</div>
-      <button class="btn btn-gold" id="dailyBtn" onclick="claimDaily()">Получить</button>
-      <div class="cooldown-bar" id="dailyBar" style="display:none">
-        <div class="cooldown-fill" id="dailyFill" style="width:0%"></div>
-      </div>
+      <button class="btn btn-primary" id="dailyBtn" onclick="claimDaily()">Получить</button>
       <div class="cooldown-text" id="dailyCooldown"></div>
     </div>
 
-    <!-- Ad Bonus -->
-    <div class="bonus-card ad-card">
+    <div class="bonus-card">
       <div class="bonus-big-icon">📺</div>
       <div class="bonus-title">Реклама за монеты</div>
-      <div class="bonus-desc">Посмотри короткую рекламу и получи монеты мгновенно!</div>
+      <div class="bonus-desc">Досмотри рекламу — <b>+50 🪙</b> .</div>
       <div class="bonus-reward">+50 🪙</div>
       <button class="btn btn-primary" id="adBonusBtn" onclick="openAdModal()">▶ Смотреть рекламу</button>
       <div class="cooldown-text" id="adCooldown"></div>
     </div>
 
-    <!-- Game Tip -->
-    <div class="bonus-card" style="border-color:rgba(41,121,255,.3)">
+    <div class="bonus-card">
       <div class="bonus-big-icon">💡</div>
       <div class="bonus-title">Как зарабатывать?</div>
-      <div class="bonus-desc">
-        За каждый заезд в гонке = <b>1 монета</b><br>
-        Играй больше — копи быстрее!
-      </div>
+      <div class="bonus-desc">За каждый заезд = <b>1 🪙</b>. Чем дороже машина — тем выше скорость, манёвренность и <b>удача</b> (шанс бонуса +1 🪙).</div>
     </div>
   </div>
 </div>
 
-<!-- ===== WITHDRAWAL SCREEN ===== -->
+<!-- ===== WITHDRAW ===== -->
 <div class="screen" id="withdrawScreen">
   <div class="top-bar">
-    <div class="logo">ВЫВОД</div>
-    <div class="coin-display">
-      <span class="coin-icon">🪙</span>
-      <span class="coin-amount" id="withdrawCoins">0</span>
-    </div>
+    <button class="profile" onclick="openProfile()">
+      <div class="avatar" id="topAvatar4">U</div>
+      <div class="profile-meta"><div class="profile-name" id="topName4">Гость</div><div class="profile-id" id="topId4">tap для ID</div></div>
+    </button>
+    <div class="coin-display"><span class="ic">🪙</span><span id="withdrawCoins">0</span></div>
   </div>
-  <div class="withdraw-content">
+  <div class="screen-title">Вывод в TON</div>
+  <div class="screen-sub">Вывод доступен только на TON-кошелёк.</div>
+
+  <div class="seg" id="seg">
+    <button class="active" onclick="switchTab('new')" id="tabNew">Новая заявка</button>
+    <button onclick="switchTab('history')" id="tabHistory">История</button>
+  </div>
+
+  <div class="withdraw-content" id="tabNewContent">
     <div class="info-banner">
-      <span class="icon">⚠️</span>
-      <span>Минимальная сумма для вывода: <b>10 000 монет</b>. После подачи заявки баланс обнулится.</span>
+      <span class="icon">ℹ️</span>
+      <span>Минимум для вывода: <b>10 000 🪙</b>. Курс: <b>1 000 🪙 = 0.002 TON</b>. После заявки баланс обнулится.</span>
     </div>
 
     <div class="balance-preview">
@@ -428,67 +546,75 @@
       <span class="balance-preview-value" id="balancePreview">0 🪙</span>
     </div>
 
-    <div class="form-group">
-      <label class="form-label">Способ вывода</label>
-      <select class="form-select" id="withdrawMethod">
-        <option value="">Выбери способ...</option>
-        <option value="СБП (РФ)">СБП (РФ)</option>
-        <option value="ЮMoney">ЮMoney</option>
-        <option value="По номеру телефона">По номеру телефона</option>
-      </select>
+    <div class="converter">
+      <div class="conv-title">Калькулятор конвертации</div>
+      <div class="conv-row">
+        <input type="number" inputmode="numeric" class="conv-input" id="convCoins" placeholder="0" min="0">
+        <span class="conv-eq">→</span>
+        <div class="conv-out"><span id="convTon">0.000</span><span class="ton-ic">T</span></div>
+      </div>
+      <div class="conv-rate">1 000 🪙 = 0.002 TON · введите количество монет</div>
     </div>
 
     <div class="form-group">
-      <label class="form-label">Контакты / Реквизиты</label>
-      <input class="form-input" type="text" id="withdrawContact" placeholder="Адрес кошелька, номер карты, @username...">
+      <label class="form-label">Адрес TON-кошелька</label>
+      <input class="form-input" type="text" id="withdrawContact" placeholder="UQ... / EQ...">
     </div>
 
     <div class="form-group">
-      <label class="form-label">Причина / Комментарий</label>
-      <textarea class="form-textarea" id="withdrawReason" placeholder="Укажи дополнительную информацию (необязательно)..."></textarea>
+      <label class="form-label">Комментарий (необязательно)</label>
+      <textarea class="form-textarea" id="withdrawReason" placeholder="Memo / комментарий"></textarea>
     </div>
 
-    <button class="btn btn-green" id="withdrawBtn" onclick="submitWithdraw()">💸 Отправить заявку</button>
+    <button class="btn btn-success" id="withdrawBtn" onclick="submitWithdraw()">💎 Отправить заявку</button>
+  </div>
+
+  <div class="withdraw-content" id="tabHistoryContent" style="display:none">
+    <div id="historyList"></div>
   </div>
 </div>
 
-<!-- ===== NAV BAR ===== -->
+<!-- ===== NAV ===== -->
 <nav class="nav-bar">
   <button class="nav-btn active" id="nav-game" onclick="showScreen('game')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3m8 0h3a2 2 0 002-2v-3"/>
-      <circle cx="12" cy="12" r="3"/>
-    </svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14l-1.5-7h-11L5 17z"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/></svg>
     Гонка
   </button>
   <button class="nav-btn" id="nav-shop" onclick="showScreen('shop')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
-    </svg>
-    Магазин
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M3 9v11h18V9"/><path d="M9 13h6"/></svg>
+    Гараж
   </button>
   <button class="nav-btn" id="nav-bonus" onclick="showScreen('bonus')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <polyline points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-    </svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/></svg>
     Бонус
   </button>
   <button class="nav-btn" id="nav-withdraw" onclick="showScreen('withdraw')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
-      <line x1="1" y1="10" x2="23" y2="10"/>
-    </svg>
-    Вывод
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 5l-3 6h6l-3 6"/></svg>
+    Вывод TON
   </button>
 </nav>
 
 <script>
-// ===== CONFIG =====
+/* ============================================================
+   CONFIG
+   ⚠️ ВНИМАНИЕ: BOT_TOKEN тут публичный — любой может извлечь.
+   Это требование клиента (без backend). Для прода — вынести
+   на сервер (Edge Function / Cloud Function).
+   ============================================================ */
 const BOT_TOKEN = '8757848561:AAHvmYWvQPosZRRbAUfrlBCbYHMhLElARPA';
 const ADMIN_ID = '7815623051';
-const ADSGRAM_BLOCK_ID = 'YOUR_BLOCK_ID';
+const ADSGRAM_BLOCK_ID = 'YOUR_BLOCK_ID_HERE'; // ← вставь реальный int-XXXXX из partner.adsgram.ai
 
-// ===== FIREBASE =====
+// Экономика
+const COINS_PER_TON = 500000; // 1000 🪙 = 0.002 TON  →  500000 🪙 = 1 TON
+const MIN_WITHDRAW = 10000;
+const DAILY_COOLDOWN = 24 * 60 * 60 * 1000;
+const AD_COOLDOWN = 60 * 1000;          // 60 сек между показами рекламы
+const AD_CLICK_BONUS_MS = 20000;        // 20 сек у рекламодателя для +70
+const AD_CLICK_BONUS = 70;
+const AD_BASE_REWARD = 50;
+
+/* ===== FIREBASE ===== */
 const firebaseConfig = {
   apiKey: "AIzaSyDH22Ke6R5TDILkX6hUHjd0P9kZnzmD_CI",
   authDomain: "quiz-2f8df.firebaseapp.com",
@@ -500,7 +626,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// ===== STATE =====
+/* ===== STATE ===== */
 let state = {
   coins: 0,
   highscore: 0,
@@ -509,319 +635,380 @@ let state = {
   lastDaily: 0,
   lastAd: 0,
   dailyStreak: 0,
+  muted: false,
 };
 
-// ===== CARS DATA =====
+/* ===== CARS (with luck) ===== */
 const CARS = [
-  { id: 'car_basic', name: 'Городской', emoji: '🚗', price: 0, speed: 3, agility: 3, color: '#4fc3f7' },
-  { id: 'car_sport', name: 'Спортивный', emoji: '🏎️', price: 500, speed: 5, agility: 4, color: '#ff4d00' },
-  { id: 'car_racing', name: 'Гоночный', emoji: '🚀', price: 1500, speed: 7, agility: 5, color: '#ffd700' },
-  { id: 'car_muscle', name: 'Мускл Кар', emoji: '🚙', price: 800, speed: 4, agility: 3, color: '#e040fb' },
-  { id: 'car_super', name: 'Суперкар', emoji: '⚡', price: 3000, speed: 9, agility: 6, color: '#00e676' },
-  { id: 'car_cyber', name: 'Кибертрак', emoji: '🤖', price: 5000, speed: 8, agility: 4, color: '#29b6f6' },
+  { id: 'car_basic',  name: 'Городской',  emoji: '🚗', price: 0,    speed: 3, agility: 3, luck: 0, color: '#4aa8ff' },
+  { id: 'car_sport',  name: 'Спортивный', emoji: '🏎️', price: 500,  speed: 5, agility: 4, luck: 1, color: '#ff7043' },
+  { id: 'car_muscle', name: 'Мускл Кар',  emoji: '🚙', price: 1200, speed: 4, agility: 3, luck: 2, color: '#ab47bc' },
+  { id: 'car_racing', name: 'Гоночный',   emoji: '🚀', price: 3000, speed: 7, agility: 5, luck: 2, color: '#ffd54f' },
+  { id: 'car_super',  name: 'Суперкар',   emoji: '⚡', price: 6000, speed: 9, agility: 6, luck: 3, color: '#26c281' },
+  { id: 'car_cyber',  name: 'Кибертрак',  emoji: '🤖', price: 12000,speed: 8, agility: 5, luck: 4, color: '#29b6f6' },
 ];
 
-// ===== USER ID =====
+/* ===== TELEGRAM USER ===== */
 let tgUser = null;
-if (window.Telegram?.WebApp) {
-  window.Telegram.WebApp.ready();
-  window.Telegram.WebApp.expand();
-  tgUser = window.Telegram.WebApp.initDataUnsafe?.user;
+const tg = window.Telegram?.WebApp;
+if (tg) {
+  try { tg.ready(); tg.expand(); tg.setHeaderColor && tg.setHeaderColor('#ffffff'); tg.setBackgroundColor && tg.setBackgroundColor('#f2f4f8'); } catch(e){}
+  tgUser = tg.initDataUnsafe?.user;
+}
+function haptic(type='light') {
+  try {
+    if (!tg?.HapticFeedback) return;
+    if (type === 'success' || type === 'error' || type === 'warning') tg.HapticFeedback.notificationOccurred(type);
+    else tg.HapticFeedback.impactOccurred(type); // light/medium/heavy
+  } catch(e){}
 }
 
 function getUserId() {
   if (tgUser?.id) return 'tg_' + tgUser.id;
   let id = localStorage.getItem('tr_uid');
-  if (!id) {
-    id = 'web_' + Math.random().toString(36).substr(2, 9);
-    localStorage.setItem('tr_uid', id);
-  }
+  if (!id) { id = 'web_' + Math.random().toString(36).slice(2, 11); localStorage.setItem('tr_uid', id); }
   return id;
 }
 const userId = getUserId();
 
-// ===== SAVE / LOAD (Firestore) =====
+/* ===== PROFILE UI ===== */
+function applyProfileUI() {
+  const name = tgUser?.first_name ? (tgUser.first_name + (tgUser.last_name ? ' ' + tgUser.last_name : '')) : 'Гость';
+  const idLabel = tgUser?.id ? ('id ' + tgUser.id) : 'нажми, чтобы открыть';
+  const initial = (name[0] || 'U').toUpperCase();
+  const photo = tgUser?.photo_url;
+  ['topName','topName2','topName3','topName4'].forEach(id => { const el=document.getElementById(id); if (el) el.textContent = name; });
+  ['topId','topId2','topId3','topId4'].forEach(id => { const el=document.getElementById(id); if (el) el.textContent = idLabel; });
+  ['topAvatar','topAvatar2','topAvatar3','topAvatar4'].forEach(id => {
+    const el = document.getElementById(id); if (!el) return;
+    el.innerHTML = photo ? `<img src="${photo}" alt="">` : initial;
+  });
+}
+function openProfile() {
+  haptic('light');
+  document.getElementById('phName').textContent = tgUser ? `${tgUser.first_name||''} ${tgUser.last_name||''}`.trim() || 'Гость' : 'Гость';
+  document.getElementById('phUsername').textContent = tgUser?.username ? '@' + tgUser.username : '@—';
+  document.getElementById('phId').textContent = tgUser?.id || '—';
+  document.getElementById('phCoins').textContent = state.coins.toLocaleString();
+  document.getElementById('phRecord').textContent = state.highscore.toLocaleString();
+  document.getElementById('phCars').textContent = state.ownedCars.length;
+  const ph = document.getElementById('phAvatar');
+  ph.innerHTML = tgUser?.photo_url ? `<img src="${tgUser.photo_url}">` : ((tgUser?.first_name||'U')[0].toUpperCase());
+  document.getElementById('profileSheet').classList.add('show');
+}
+function closeProfile() { document.getElementById('profileSheet').classList.remove('show'); }
+function copyTgId() {
+  const id = tgUser?.id || userId;
+  navigator.clipboard?.writeText(String(id)).then(() => { showToast('ID скопирован', 'success'); haptic('success'); });
+}
+
+/* ===== FIRESTORE ===== */
 async function loadState() {
   try {
     const doc = await db.collection('users').doc(userId).get();
     if (doc.exists) {
-      const data = doc.data();
-      // merge only known fields
-      if (typeof data.coins === 'number') state.coins = data.coins;
-      if (typeof data.highscore === 'number') state.highscore = data.highscore;
-      if (Array.isArray(data.ownedCars)) state.ownedCars = data.ownedCars;
-      if (typeof data.selectedCar === 'string') state.selectedCar = data.selectedCar;
-      if (typeof data.lastDaily === 'number') state.lastDaily = data.lastDaily;
-      if (typeof data.lastAd === 'number') state.lastAd = data.lastAd;
-      if (typeof data.dailyStreak === 'number') state.dailyStreak = data.dailyStreak;
+      const d = doc.data();
+      if (typeof d.coins === 'number') state.coins = d.coins;
+      if (typeof d.highscore === 'number') state.highscore = d.highscore;
+      if (Array.isArray(d.ownedCars)) state.ownedCars = d.ownedCars;
+      if (typeof d.selectedCar === 'string') state.selectedCar = d.selectedCar;
+      if (typeof d.lastDaily === 'number') state.lastDaily = d.lastDaily;
+      if (typeof d.lastAd === 'number') state.lastAd = d.lastAd;
+      if (typeof d.dailyStreak === 'number') state.dailyStreak = d.dailyStreak;
+      if (typeof d.muted === 'boolean') state.muted = d.muted;
     } else {
-      // create default document
       await db.collection('users').doc(userId).set(state);
     }
   } catch(e) {
-    console.error('Ошибка загрузки состояния', e);
-    // fallback to localStorage if Firestore fails
-    try {
-      const s = localStorage.getItem('tr_state');
-      if (s) Object.assign(state, JSON.parse(s));
-    } catch(e2) {}
+    console.error('loadState', e);
+    try { const s = localStorage.getItem('tr_state'); if (s) Object.assign(state, JSON.parse(s)); } catch{}
   }
 }
-
 async function saveState() {
   try {
     await db.collection('users').doc(userId).set(state, { merge: true });
-    // also update local cache
     localStorage.setItem('tr_state', JSON.stringify(state));
-  } catch(e) {
-    console.error('Ошибка сохранения', e);
-  }
+  } catch(e) { console.error('saveState', e); }
 }
 
-// ===== TOAST =====
+/* ===== TOAST ===== */
 let toastTimer;
-function showToast(msg, type = 'info') {
+function showToast(msg, type='info') {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.className = 'toast show ' + type;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.className = 'toast ' + type, 2800);
+  toastTimer = setTimeout(() => t.className = 'toast ' + type, 2600);
 }
 
-// ===== SCREENS =====
+/* ===== SCREENS ===== */
 function showScreen(name) {
+  haptic('light');
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  if (name === 'game') {
-    document.getElementById('gameScreen').classList.add('active');
-    document.getElementById('nav-game').classList.add('active');
-    updateGameUI();
-  } else if (name === 'shop') {
-    document.getElementById('shopScreen').classList.add('active');
-    document.getElementById('nav-shop').classList.add('active');
-    renderShop();
-  } else if (name === 'bonus') {
-    document.getElementById('bonusScreen').classList.add('active');
-    document.getElementById('nav-bonus').classList.add('active');
-    renderBonus();
-  } else if (name === 'withdraw') {
-    document.getElementById('withdrawScreen').classList.add('active');
-    document.getElementById('nav-withdraw').classList.add('active');
-    renderWithdraw();
-  }
+  if (name === 'game')     { document.getElementById('gameScreen').classList.add('active'); document.getElementById('nav-game').classList.add('active'); updateGameUI(); }
+  else if (name === 'shop'){ document.getElementById('shopScreen').classList.add('active'); document.getElementById('nav-shop').classList.add('active'); renderShop(); }
+  else if (name === 'bonus'){document.getElementById('bonusScreen').classList.add('active');document.getElementById('nav-bonus').classList.add('active');renderBonus(); }
+  else if (name === 'withdraw'){document.getElementById('withdrawScreen').classList.add('active');document.getElementById('nav-withdraw').classList.add('active');renderWithdraw(); switchTab('new'); }
   updateCoinDisplays();
+  applyProfileUI();
 }
-
 function goToMainMenu() {
   document.getElementById('gameOverOverlay').style.display = 'none';
   document.getElementById('startOverlay').style.display = 'block';
   isRunning = false;
 }
-
 function updateCoinDisplays() {
-  ['shopCoins','bonusCoins','withdrawCoins','gameCoins'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = state.coins.toLocaleString();
+  ['shopCoins','bonusCoins','withdrawCoins','gameCoins','gameCoinsTop'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.textContent = state.coins.toLocaleString();
   });
 }
 
-// ===== GAME ENGINE =====
+/* ===== AUDIO (lightweight WebAudio) ===== */
+const Audio = {
+  ctx: null,
+  engineOsc: null, engineGain: null,
+  ensure() {
+    if (this.ctx) return;
+    try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){}
+  },
+  play(freq=440, dur=0.1, type='sine', vol=0.15) {
+    if (state.muted) return;
+    this.ensure(); if (!this.ctx) return;
+    const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.value = vol;
+    o.connect(g).connect(this.ctx.destination);
+    o.start(); g.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + dur);
+    o.stop(this.ctx.currentTime + dur);
+  },
+  coin() { this.play(880, 0.08, 'triangle', 0.18); setTimeout(()=>this.play(1320, 0.08, 'triangle', 0.16), 60); },
+  crash() {
+    if (state.muted) return;
+    this.ensure(); if (!this.ctx) return;
+    const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.5, this.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i=0;i<data.length;i++) data[i] = (Math.random()*2-1) * Math.pow(1 - i/data.length, 2);
+    const src = this.ctx.createBufferSource(); src.buffer = buf;
+    const g = this.ctx.createGain(); g.gain.value = 0.4;
+    src.connect(g).connect(this.ctx.destination); src.start();
+  },
+  startEngine() {
+    if (state.muted) return; this.stopEngine();
+    this.ensure(); if (!this.ctx) return;
+    const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+    o.type = 'sawtooth'; o.frequency.value = 80; g.gain.value = 0.04;
+    o.connect(g).connect(this.ctx.destination); o.start();
+    this.engineOsc = o; this.engineGain = g;
+  },
+  setEngine(speed) {
+    if (!this.engineOsc) return;
+    this.engineOsc.frequency.setTargetAtTime(60 + speed * 18, this.ctx.currentTime, 0.05);
+  },
+  stopEngine() { try { this.engineOsc?.stop(); } catch{} this.engineOsc = null; this.engineGain = null; },
+};
+function toggleMute() {
+  state.muted = !state.muted;
+  document.getElementById('muteBtn').textContent = state.muted ? '🔇' : '🔊';
+  saveState();
+  if (state.muted) Audio.stopEngine(); else if (isRunning) Audio.startEngine();
+  haptic('light');
+}
+
+/* ===== GAME ===== */
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-let isRunning = false;
-let gameScore = 0;
-let gameFrame = 0;
-let gameSpeed = 3;
-let playerX = 0;
-let playerLane = 1;
-let movingLeft = false, movingRight = false;
-let obstacles = [];
-let particles = [];
-let roadLines = [];
-let animFrame;
-let earnedCoins = 0;
+let isRunning = false, gameScore = 0, gameFrame = 0, gameSpeed = 3;
+let playerX = 0, movingLeft = false, movingRight = false;
+let obstacles = [], particles = [], roadLines = [], pickups = [];
+let animFrame, earnedCoins = 0;
 
 function resizeCanvas() {
-  const maxH = window.innerHeight - 200;
-  canvas.width = window.innerWidth;
-  canvas.height = Math.min(maxH, 380);
+  const wrap = document.getElementById('gameScreen');
+  const w = Math.min(window.innerWidth - 24, 520);
+  const maxH = window.innerHeight - 360;
+  canvas.width = w;
+  canvas.height = Math.max(280, Math.min(maxH, 460));
+  canvas.style.width = w + 'px';
   playerX = canvas.width / 2 - 20;
   initRoadLines();
 }
-
 function initRoadLines() {
   roadLines = [];
-  for (let i = 0; i < 8; i++) {
-    roadLines.push({ y: i * (canvas.height / 7) });
-  }
+  for (let i = 0; i < 10; i++) roadLines.push({ y: i * (canvas.height / 8) });
 }
-
-function getCarData() {
-  return CARS.find(c => c.id === state.selectedCar) || CARS[0];
-}
+function getCarData() { return CARS.find(c => c.id === state.selectedCar) || CARS[0]; }
 
 function startGame() {
+  haptic('medium');
   document.getElementById('startOverlay').style.display = 'none';
   document.getElementById('gameOverOverlay').style.display = 'none';
-  isRunning = true;
-  gameScore = 0;
-  gameFrame = 0;
-  earnedCoins = 0;
-  gameSpeed = 3 + (getCarData().speed * 0.3);
+  isRunning = true; gameScore = 0; gameFrame = 0; earnedCoins = 0;
+  const car = getCarData();
+  gameSpeed = 3 + car.speed * 0.3;
   playerX = canvas.width / 2 - 20;
-  obstacles = [];
-  particles = [];
+  obstacles = []; particles = []; pickups = [];
   movingLeft = false; movingRight = false;
-  cancelAnimationFrame(animFrame);
-  gameLoop();
+  Audio.startEngine();
+  cancelAnimationFrame(animFrame); gameLoop();
 }
-
-function gameLoop() {
-  if (!isRunning) return;
-  update();
-  draw();
-  animFrame = requestAnimationFrame(gameLoop);
-}
+function gameLoop() { if (!isRunning) return; update(); draw(); animFrame = requestAnimationFrame(gameLoop); }
 
 function update() {
-  gameFrame++;
-  gameScore += 1;
-  gameSpeed += 0.002;
+  gameFrame++; gameScore++;
+  // Прогрессивная сложность
+  gameSpeed += 0.0035;
 
-  const agility = getCarData().agility;
-  const moveSpeed = 3 + agility * 0.6;
+  const car = getCarData();
+  const moveSpeed = 3 + car.agility * 0.7;
+  if (movingLeft)  playerX = Math.max(10, playerX - moveSpeed);
+  if (movingRight) playerX = Math.min(canvas.width - 50, playerX + moveSpeed);
 
-  if (movingLeft) playerX = Math.max(20, playerX - moveSpeed);
-  if (movingRight) playerX = Math.min(canvas.width - 60, playerX + moveSpeed);
+  roadLines.forEach(l => { l.y += gameSpeed; if (l.y > canvas.height) l.y = -20; });
 
-  // Road lines
-  roadLines.forEach(l => {
-    l.y += gameSpeed;
-    if (l.y > canvas.height) l.y = -20;
-  });
-
-  // Obstacles
-  if (gameFrame % Math.max(40, 80 - Math.floor(gameFrame / 200)) === 0) {
+  // spawn obstacles
+  const spawnRate = Math.max(28, 80 - Math.floor(gameFrame / 180));
+  if (gameFrame % spawnRate === 0) {
     const laneW = canvas.width / 3;
     const lane = Math.floor(Math.random() * 3);
-    const colors = ['#e53935','#fb8c00','#8e24aa','#00897b','#1e88e5'];
     obstacles.push({
-      x: lane * laneW + laneW/2 - 20,
-      y: -60, w: 40, h: 55,
-      color: colors[Math.floor(Math.random()*colors.length)],
-      emoji: ['🚕','🚌','🚎','🏗️','🚑'][Math.floor(Math.random()*5)]
+      x: lane * laneW + laneW/2 - 20, y: -60, w: 40, h: 55,
+      color: ['#ef5350','#ffa726','#ab47bc','#26a69a','#42a5f5'][Math.floor(Math.random()*5)],
+      emoji: ['🚕','🚌','🚎','🚜','🚑'][Math.floor(Math.random()*5)],
+      angle: 0,
     });
   }
+  // spawn coin pickup (luck-based)
+  if (gameFrame % 220 === 0 && Math.random() < 0.4 + car.luck * 0.07) {
+    const laneW = canvas.width / 3;
+    const lane = Math.floor(Math.random() * 3);
+    pickups.push({ x: lane * laneW + laneW/2 - 10, y: -40, r: 10, taken: false });
+  }
 
-  obstacles.forEach(o => { o.y += gameSpeed * 1.1; });
+  obstacles.forEach(o => { o.y += gameSpeed * 1.05; });
   obstacles = obstacles.filter(o => o.y < canvas.height + 80);
+  pickups.forEach(p => p.y += gameSpeed);
+  pickups = pickups.filter(p => p.y < canvas.height + 30 && !p.taken);
 
-  // Collision
+  // collision
+  const py = canvas.height - 95;
   for (const o of obstacles) {
     if (playerX + 35 > o.x + 5 && playerX + 5 < o.x + o.w - 5 &&
-        canvas.height - 90 + 5 < o.y + o.h - 5 && canvas.height - 90 + 50 > o.y + 5) {
+        py + 5 < o.y + o.h - 5 && py + 50 > o.y + 5) {
       triggerCrash(); return;
     }
   }
+  // pickup collision
+  for (const p of pickups) {
+    const cx = playerX + 20, cy = py + 25;
+    if (Math.hypot(cx - p.x, cy - p.y) < p.r + 18) {
+      p.taken = true;
+      earnedCoins += 1;
+      state.coins += 1;
+      Audio.coin(); haptic('light');
+      updateCoinDisplays();
+    }
+  }
 
-  // Particles
-  if (gameFrame % 3 === 0) {
-    particles.push({ x: playerX + 20, y: canvas.height - 90, vx: (Math.random()-.5)*2, vy: Math.random()*2+1, life: 15, color: '#ff8c00' });
+  // particles (exhaust)
+  if (gameFrame % 2 === 0) {
+    particles.push({ x: playerX + 10, y: py + 50, vx: (Math.random()-.5)*1.2, vy: Math.random()*1.6+0.8, life: 18, color: 'rgba(120,140,160,0.55)' });
+    particles.push({ x: playerX + 30, y: py + 50, vx: (Math.random()-.5)*1.2, vy: Math.random()*1.6+0.8, life: 18, color: 'rgba(120,140,160,0.55)' });
   }
   particles.forEach(p => { p.x += p.vx; p.y += p.vy; p.life--; });
   particles = particles.filter(p => p.life > 0);
 
-  // Score & UI (больше не начисляем монеты по очкам)
+  // engine pitch
+  Audio.setEngine(gameSpeed);
+
   document.getElementById('scoreDisplay').textContent = gameScore;
-  document.getElementById('gameCoins').textContent = state.coins.toLocaleString();
-  document.getElementById('speedFill').style.width = Math.min(100, (gameSpeed / 15) * 100) + '%';
+  document.getElementById('speedFill').style.width = Math.min(100, (gameSpeed / 16) * 100) + '%';
 }
 
 function draw() {
-  // Road background
-  ctx.fillStyle = '#141420';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // road background (light)
+  const g = ctx.createLinearGradient(0,0,0,canvas.height);
+  g.addColorStop(0,'#dde7f1'); g.addColorStop(1,'#c9d6e3');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Road lanes
-  ctx.fillStyle = '#1a1a2e';
+  // lane background
   const laneW = canvas.width / 3;
-  for (let i = 0; i < 3; i++) {
-    ctx.fillRect(i * laneW, 0, laneW - 2, canvas.height);
-  }
+  ctx.fillStyle = '#b9c8d6';
+  for (let i = 0; i < 3; i++) ctx.fillRect(i * laneW + 1, 0, laneW - 2, canvas.height);
 
-  // Road lines
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-  ctx.setLineDash([20, 20]);
-  ctx.lineWidth = 2;
+  // dashed lines
+  ctx.strokeStyle = 'rgba(255,255,255,.85)';
+  ctx.lineWidth = 3; ctx.setLineDash([24, 18]); ctx.lineCap = 'round';
   for (let lane = 1; lane < 3; lane++) {
     const lx = lane * laneW;
-    roadLines.forEach(l => {
-      ctx.beginPath();
-      ctx.moveTo(lx, l.y);
-      ctx.lineTo(lx, l.y + 30);
-      ctx.stroke();
-    });
+    roadLines.forEach(l => { ctx.beginPath(); ctx.moveTo(lx, l.y); ctx.lineTo(lx, l.y + 28); ctx.stroke(); });
   }
   ctx.setLineDash([]);
 
-  // Particles (exhaust)
+  // particles
   particles.forEach(p => {
-    ctx.globalAlpha = p.life / 15 * 0.6;
+    ctx.globalAlpha = p.life / 18 * 0.6;
     ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill();
   });
   ctx.globalAlpha = 1;
 
-  // Player car
+  // pickups (coins)
+  pickups.forEach(p => {
+    if (p.taken) return;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    ctx.fillStyle = '#f5a623'; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 10px Inter'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('₵', p.x, p.y);
+  });
+
+  // player car
   const carColor = getCarData().color;
   const py = canvas.height - 95;
   ctx.save();
-  // Car body
+  // shadow
+  ctx.fillStyle = 'rgba(0,0,0,.18)';
+  ctx.beginPath(); ctx.ellipse(playerX + 20, py + 60, 22, 6, 0, 0, Math.PI*2); ctx.fill();
+  // body
   ctx.fillStyle = carColor;
-  ctx.beginPath();
-  ctx.roundRect(playerX + 4, py + 10, 32, 45, 6);
-  ctx.fill();
-  // Windshield
-  ctx.fillStyle = 'rgba(0,0,0,0.4)';
-  ctx.beginPath();
-  ctx.roundRect(playerX + 8, py + 14, 24, 16, 4);
-  ctx.fill();
-  // Wheels
-  ctx.fillStyle = '#111';
-  [[playerX, py + 12], [playerX + 32, py + 12], [playerX, py + 42], [playerX + 32, py + 42]].forEach(([wx, wy]) => {
-    ctx.beginPath(); ctx.arc(wx + 4, wy + 4, 5, 0, Math.PI * 2); ctx.fill();
-  });
+  ctx.beginPath(); roundRect(ctx, playerX + 4, py + 8, 32, 50, 8); ctx.fill();
+  // glass
+  ctx.fillStyle = 'rgba(15,30,50,.55)';
+  ctx.beginPath(); roundRect(ctx, playerX + 8, py + 14, 24, 16, 5); ctx.fill();
+  // headlights
+  ctx.fillStyle = '#fff8c5'; ctx.fillRect(playerX + 8, py + 8, 6, 3); ctx.fillRect(playerX + 26, py + 8, 6, 3);
+  // wheels
+  ctx.fillStyle = '#1a1f2c';
+  [[playerX+0, py+12],[playerX+32, py+12],[playerX+0, py+42],[playerX+32, py+42]].forEach(([wx,wy])=>{ ctx.beginPath(); ctx.roundRect(wx, wy, 8, 12, 2); ctx.fill(); });
   ctx.restore();
 
-  // Obstacles
+  // obstacles
   obstacles.forEach(o => {
-    ctx.font = '36px serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(o.emoji, o.x + o.w / 2, o.y + 40);
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,.18)';
+    ctx.beginPath(); ctx.ellipse(o.x + o.w/2, o.y + o.h + 4, 22, 5, 0, 0, Math.PI*2); ctx.fill();
+    ctx.font = '38px serif'; ctx.textAlign = 'center';
+    ctx.fillText(o.emoji, o.x + o.w / 2, o.y + 42);
+    ctx.restore();
   });
-
-  // Score HUD
-  ctx.fillStyle = 'rgba(255,255,255,0.04)';
-  ctx.fillRect(0, 0, canvas.width, 30);
 }
+function roundRect(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
 
 function triggerCrash() {
   isRunning = false;
   cancelAnimationFrame(animFrame);
+  Audio.stopEngine(); Audio.crash(); haptic('error');
 
-  // Всегда даём ровно 1 монету за раунд
-  earnedCoins = 1;
-  state.coins += earnedCoins;
+  earnedCoins += 1; // базово 1 за заезд
+  state.coins += 1;
   if (gameScore > state.highscore) state.highscore = gameScore;
-  saveState(); // сохраняем в Firestore
+  saveState();
 
   document.getElementById('finalScore').textContent = gameScore;
   document.getElementById('finalCoins').textContent = '+' + earnedCoins;
   document.getElementById('finalHighscore').textContent = state.highscore;
   document.getElementById('highscoreDisplay').textContent = state.highscore;
-
   document.getElementById('gameOverOverlay').style.display = 'flex';
   updateCoinDisplays();
 }
@@ -829,293 +1016,353 @@ function triggerCrash() {
 function updateGameUI() {
   document.getElementById('highscoreDisplay').textContent = state.highscore;
   document.getElementById('scoreDisplay').textContent = '0';
+  document.getElementById('muteBtn').textContent = state.muted ? '🔇' : '🔊';
   updateCoinDisplays();
 }
+function startLeft(){ movingLeft=true; haptic('light'); } function stopLeft(){ movingLeft=false; }
+function startRight(){ movingRight=true; haptic('light'); } function stopRight(){ movingRight=false; }
+document.addEventListener('keydown', e => { if (e.key==='ArrowLeft') startLeft(); if (e.key==='ArrowRight') startRight(); });
+document.addEventListener('keyup',   e => { if (e.key==='ArrowLeft') stopLeft();  if (e.key==='ArrowRight') stopRight(); });
 
-// Controls
-function startLeft() { movingLeft = true; }
-function stopLeft() { movingLeft = false; }
-function startRight() { movingRight = true; }
-function stopRight() { movingRight = false; }
-
-// Keyboard
-document.addEventListener('keydown', e => {
-  if (e.key === 'ArrowLeft') startLeft();
-  if (e.key === 'ArrowRight') startRight();
-});
-document.addEventListener('keyup', e => {
-  if (e.key === 'ArrowLeft') stopLeft();
-  if (e.key === 'ArrowRight') stopRight();
-});
-
-// ===== SHOP =====
+/* ===== SHOP ===== */
 function renderShop() {
   document.getElementById('shopCoins').textContent = state.coins.toLocaleString();
-  const grid = document.getElementById('carsGrid');
-  grid.innerHTML = '';
+  const grid = document.getElementById('carsGrid'); grid.innerHTML = '';
   CARS.forEach(car => {
     const owned = state.ownedCars.includes(car.id);
     const selected = state.selectedCar === car.id;
     const canBuy = state.coins >= car.price && !owned;
     const card = document.createElement('div');
-    card.className = 'car-card' + (owned ? ' owned' : '') + (selected ? ' selected' : '');
+    card.className = 'car-card' + (selected ? ' selected' : '');
     card.innerHTML = `
       <div class="car-emoji">${car.emoji}</div>
       <div class="car-info">
         <div class="car-name">${car.name}</div>
         <div class="car-stats">
-          <div class="car-stat-badge">🏎 <span>${car.speed}/10</span></div>
-          <div class="car-stat-badge">🎯 <span>${car.agility}/6</span></div>
+          <div class="car-stat-badge">⚡ <b>${car.speed}/10</b></div>
+          <div class="car-stat-badge">🎯 <b>${car.agility}/6</b></div>
+          <div class="car-stat-badge">🍀 <b>${car.luck}/5</b></div>
         </div>
-        ${car.price > 0 ? `<div class="car-price" style="margin-top:4px">🪙 ${car.price.toLocaleString()}</div>` : '<div style="margin-top:4px;font-size:12px;color:var(--green)">БЕСПЛАТНО</div>'}
+        ${car.price > 0 ? `<div class="car-price">🪙 ${car.price.toLocaleString()}</div>` : '<div class="car-price" style="color:var(--success)">Бесплатно</div>'}
       </div>
       <div class="car-action">
-        ${selected ? '<div class="badge-selected">✓ Едешь</div>' :
+        ${selected ? '<div class="badge-selected">✓ выбрана</div>' :
           owned ? `<button class="btn btn-secondary btn-sm" onclick="selectCar('${car.id}')">Выбрать</button>` :
-          canBuy ? `<button class="btn btn-gold btn-sm" onclick="buyCar('${car.id}')">Купить</button>` :
-          `<button class="btn btn-disabled btn-sm" disabled>🔒</button>`}
+          canBuy ? `<button class="btn btn-primary btn-sm" onclick="buyCar('${car.id}')">Купить</button>` :
+                   `<button class="btn btn-disabled btn-sm" disabled>🔒</button>`}
       </div>`;
     grid.appendChild(card);
   });
 }
-
 function buyCar(id) {
   const car = CARS.find(c => c.id === id);
   if (!car || state.ownedCars.includes(id)) return;
-  if (state.coins < car.price) { showToast('Недостаточно монет! 🪙', 'error'); return; }
-  state.coins -= car.price;
-  state.ownedCars.push(id);
-  state.selectedCar = id;
-  saveState();
-  showToast(`${car.emoji} ${car.name} куплен!`, 'success');
-  renderShop();
-  updateCoinDisplays();
+  if (state.coins < car.price) { showToast('Недостаточно монет', 'error'); haptic('error'); return; }
+  state.coins -= car.price; state.ownedCars.push(id); state.selectedCar = id;
+  saveState(); haptic('success');
+  showToast(`${car.emoji} ${car.name} куплен`, 'success');
+  renderShop(); updateCoinDisplays();
 }
-
 function selectCar(id) {
-  state.selectedCar = id;
-  saveState();
+  state.selectedCar = id; saveState(); haptic('success');
   const car = CARS.find(c => c.id === id);
-  showToast(`${car.emoji} ${car.name} выбран!`, 'success');
+  showToast(`${car.emoji} ${car.name} выбрана`, 'success');
   renderShop();
 }
 
-// ===== BONUS =====
-const DAILY_COOLDOWN = 24 * 60 * 60 * 1000;
-const AD_COOLDOWN = 20 * 1000; // 20 секунд
-
+/* ===== BONUS ===== */
 function renderBonus() {
   document.getElementById('bonusCoins').textContent = state.coins.toLocaleString();
   const now = Date.now();
   const dailyLeft = DAILY_COOLDOWN - (now - state.lastDaily);
   const adLeft = AD_COOLDOWN - (now - state.lastAd);
-
   const dailyBtn = document.getElementById('dailyBtn');
-  const dailyBar = document.getElementById('dailyBar');
-  const dailyFill = document.getElementById('dailyFill');
-  const dailyCooldown = document.getElementById('dailyCooldown');
-
+  const dailyCool = document.getElementById('dailyCooldown');
+  const reward = 100 + state.dailyStreak * 20;
+  document.getElementById('dailyRewardText').textContent = `+${reward} 🪙`;
   if (dailyLeft > 0) {
-    dailyBtn.className = 'btn btn-disabled'; dailyBtn.disabled = true;
-    dailyBtn.textContent = '⏳ Уже получено';
-    dailyBar.style.display = 'block';
-    const pct = ((DAILY_COOLDOWN - dailyLeft) / DAILY_COOLDOWN) * 100;
-    dailyFill.style.width = pct + '%';
-    const h = Math.floor(dailyLeft / 3600000);
-    const m = Math.floor((dailyLeft % 3600000) / 60000);
-    dailyCooldown.textContent = `Следующий через: ${h}ч ${m}м`;
+    dailyBtn.className = 'btn btn-disabled'; dailyBtn.disabled = true; dailyBtn.textContent = '⏳ уже получено';
+    const h = Math.floor(dailyLeft/3600000), m = Math.floor((dailyLeft%3600000)/60000);
+    dailyCool.textContent = `Следующий через ${h}ч ${m}м`;
   } else {
-    dailyBtn.className = 'btn btn-gold'; dailyBtn.disabled = false;
-    dailyBtn.textContent = 'Получить';
-    dailyBar.style.display = 'none'; dailyCooldown.textContent = '';
+    dailyBtn.className = 'btn btn-primary'; dailyBtn.disabled = false; dailyBtn.textContent = 'Получить';
+    dailyCool.textContent = '';
   }
-
   const adBtn = document.getElementById('adBonusBtn');
-  const adCooldown = document.getElementById('adCooldown');
+  const adCool = document.getElementById('adCooldown');
   if (adLeft > 0) {
-    adBtn.className = 'btn btn-disabled'; adBtn.disabled = true;
-    adBtn.textContent = '⏳ Подождите...';
-    const s = Math.floor(adLeft / 1000);
-    adCooldown.textContent = `Снова через: ${s}с`;
+    adBtn.className = 'btn btn-disabled'; adBtn.disabled = true; adBtn.textContent = '⏳ подождите';
+    adCool.textContent = `Снова через ${Math.ceil(adLeft/1000)}с`;
   } else {
-    adBtn.className = 'btn btn-primary'; adBtn.disabled = false;
-    adBtn.textContent = '▶ Смотреть рекламу';
-    adCooldown.textContent = '';
+    adBtn.className = 'btn btn-primary'; adBtn.disabled = false; adBtn.textContent = '▶ Смотреть рекламу';
+    adCool.textContent = '';
   }
 }
-
 function claimDaily() {
   const now = Date.now();
-  if (now - state.lastDaily < DAILY_COOLDOWN) { showToast('Уже получено сегодня!', 'error'); return; }
-  const reward = 100 + state.dailyStreak * 20;
-  state.coins += reward;
-  state.lastDaily = now;
+  if (now - state.lastDaily < DAILY_COOLDOWN) { showToast('Уже получено', 'error'); haptic('error'); return; }
+  // streak: если прошло меньше 48ч — продолжаем стрик, иначе сбрасываем
   state.dailyStreak = (now - state.lastDaily < DAILY_COOLDOWN * 2) ? state.dailyStreak + 1 : 1;
+  const reward = 100 + (state.dailyStreak - 1) * 20;
+  state.coins += reward; state.lastDaily = now;
   saveState();
-  showToast(`🎁 +${reward} монет!`, 'success');
-  renderBonus();
-  updateCoinDisplays();
+  showToast(`🎁 +${reward} 🪙 (стрик ${state.dailyStreak})`, 'success'); haptic('success');
+  renderBonus(); updateCoinDisplays();
 }
 
-// ===== ADSGRAM =====
+/* ===== ADSGRAM (correct pattern) ===== */
 let AdController = null;
+let adSdkReady = false;
+let adClickTimer = null;     // ждём blur для бонуса за клик
+let adBlurStart = 0;
+let adClickArmed = false;    // окно ждёт перехода после rewarded
 
 function initAdsgram() {
-  if (window.Adsgram && ADSGRAM_BLOCK_ID !== 'YOUR_BLOCK_ID_HERE') {
-    try { AdController = window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID }); } catch(e) {}
-  }
+  try {
+    if (window.Adsgram && ADSGRAM_BLOCK_ID && ADSGRAM_BLOCK_ID !== 'YOUR_BLOCK_ID_HERE') {
+      AdController = window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID });
+      adSdkReady = true;
+    }
+  } catch (e) { console.warn('Adsgram init failed', e); }
 }
 
 function openAdModal() {
   const now = Date.now();
-  if (now - state.lastAd < AD_COOLDOWN) { showToast('Подождите немного!', 'error'); return; }
+  if (now - state.lastAd < AD_COOLDOWN) {
+    const left = Math.ceil((AD_COOLDOWN - (now - state.lastAd))/1000);
+    showToast(`Подождите ${left}с`, 'error'); haptic('error'); return;
+  }
+  haptic('light');
   document.getElementById('adModal').classList.add('show');
   document.getElementById('adModalIcon').textContent = '📺';
   document.getElementById('adModalTitle').textContent = 'Реклама за монеты';
-  document.getElementById('adModalText').textContent = 'Посмотрите рекламу до конца и получите +50 монет!';
+  document.getElementById('adModalText').textContent = `Досмотрите до конца — +${AD_BASE_REWARD} 🪙.`;
   document.getElementById('adSpinner').style.display = 'none';
   document.getElementById('adModalBtns').style.display = 'flex';
 }
-
-function closeAdModal() {
-  document.getElementById('adModal').classList.remove('show');
-}
+function closeAdModal() { document.getElementById('adModal').classList.remove('show'); }
 
 function startWatchAd() {
   document.getElementById('adModalBtns').style.display = 'none';
   document.getElementById('adSpinner').style.display = 'block';
-  document.getElementById('adModalText').textContent = 'Загружаем рекламу...';
+  document.getElementById('adModalText').textContent = 'Загружаем рекламу…';
 
-  if (AdController) {
-    AdController.show().then((result) => {
-      if (result.done) {
-        rewardAdCoins();
+  if (!adSdkReady || !AdController) {
+    // Fallback: SDK не загружен (desktop/VPN/нет blockId) — честно сообщаем
+    setTimeout(() => {
+      closeAdModal();
+      if (ADSGRAM_BLOCK_ID === 'YOUR_BLOCK_ID_HERE') {
+        showToast('Adsgram не настроен (нет blockId)', 'error');
       } else {
-        closeAdModal();
-        showToast('Досмотрите рекламу до конца!', 'error');
-        resetAdBtns();
+        showToast('Реклама недоступна. Откройте в Telegram.', 'error');
       }
-    }).catch(() => {
-  closeAdModal();
-  showToast('Нет доступной рекламы. Попробуйте позже.', 'error');
-  resetAdBtns();
-});
-  } else {
-    simulateAdView();
+      resetAdBtns(); haptic('error');
+    }, 600);
+    return;
   }
-}
 
-function simulateAdView() {
-  document.getElementById('adModalText').textContent = 'Идёт реклама... (тестовый режим)';
-  setTimeout(() => { rewardAdCoins(); }, 3000);
+  AdController.show().then((result) => {
+    // Adsgram callback: { done: true, description, state, error }
+    if (result && result.done) {
+      rewardAdCoins();
+      armClickBonus(); // ждём blur ≥20с — даём +70
+    } else {
+      closeAdModal();
+      showToast('Досмотрите рекламу до конца', 'error'); haptic('warning');
+      resetAdBtns();
+    }
+  }).catch((err) => {
+    closeAdModal();
+    const msg = err?.description || err?.error || 'Ошибка показа';
+    showToast('Реклама: ' + msg, 'error'); haptic('error');
+    resetAdBtns();
+  });
 }
-
 function rewardAdCoins() {
-  state.coins += 50;
+  state.coins += AD_BASE_REWARD;
   state.lastAd = Date.now();
-  saveState();
-  closeAdModal();
-  showToast('📺 +50 монет за рекламу!', 'success');
+  saveState(); closeAdModal();
+  showToast(`📺 +${AD_BASE_REWARD} 🪙`, 'success'); haptic('success');
   updateCoinDisplays();
   if (document.getElementById('bonusScreen').classList.contains('active')) renderBonus();
 }
-
 function resetAdBtns() {
   document.getElementById('adSpinner').style.display = 'none';
   document.getElementById('adModalBtns').style.display = 'flex';
 }
 
-// ===== WITHDRAWAL =====
+/* Bonus за клик: ждём, что пользователь свернёт мини-апп
+   (= уйдёт к рекламодателю) и пробудет там ≥20с */
+function armClickBonus() {
+  adClickArmed = true;
+  // окно у нас 90 сек на «уйти и вернуться»
+  setTimeout(() => { adClickArmed = false; }, 90000);
+}
+function onWindowBlur() {
+  if (!adClickArmed) return;
+  adBlurStart = Date.now();
+}
+function onWindowFocus() {
+  if (!adClickArmed || !adBlurStart) return;
+  const away = Date.now() - adBlurStart;
+  adBlurStart = 0;
+  if (away >= AD_CLICK_BONUS_MS) {
+    state.coins += AD_CLICK_BONUS; saveState();
+    showToast(`🎯 +${AD_CLICK_BONUS} 🪙 за переход по рекламе!`, 'success'); haptic('success');
+    updateCoinDisplays();
+    if (document.getElementById('bonusScreen').classList.contains('active')) renderBonus();
+    adClickArmed = false;
+  }
+}
+window.addEventListener('blur', onWindowBlur);
+window.addEventListener('focus', onWindowFocus);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) onWindowBlur(); else onWindowFocus();
+});
+
+/* ===== WITHDRAW ===== */
+function coinsToTon(c) { return (c / COINS_PER_TON); }
+function fmtTon(v) { return v.toFixed(4).replace(/0+$/,'').replace(/\.$/,''); }
+
+function switchTab(t) {
+  haptic('light');
+  document.getElementById('tabNew').classList.toggle('active', t==='new');
+  document.getElementById('tabHistory').classList.toggle('active', t==='history');
+  document.getElementById('tabNewContent').style.display = t==='new' ? 'flex' : 'none';
+  document.getElementById('tabHistoryContent').style.display = t==='history' ? 'flex' : 'none';
+  if (t === 'history') loadHistory();
+}
+
 function renderWithdraw() {
   document.getElementById('withdrawCoins').textContent = state.coins.toLocaleString();
   document.getElementById('balancePreview').textContent = state.coins.toLocaleString() + ' 🪙';
   const btn = document.getElementById('withdrawBtn');
-  if (state.coins < 10000) {
+  if (state.coins < MIN_WITHDRAW) {
     btn.className = 'btn btn-disabled'; btn.disabled = true;
-    btn.textContent = `💸 Нужно ${(10000 - state.coins).toLocaleString()} монет ещё`;
+    btn.textContent = `Нужно ещё ${(MIN_WITHDRAW - state.coins).toLocaleString()} 🪙`;
   } else {
-    btn.className = 'btn btn-green'; btn.disabled = false;
-    btn.textContent = '💸 Отправить заявку';
+    btn.className = 'btn btn-success'; btn.disabled = false;
+    btn.textContent = '💎 Отправить заявку';
   }
+  // pre-fill converter with current balance
+  const ci = document.getElementById('convCoins');
+  if (!ci.value) ci.value = state.coins;
+  recalcConv();
+}
+function recalcConv() {
+  const v = parseInt(document.getElementById('convCoins').value || '0', 10);
+  const ton = coinsToTon(Math.max(0, v));
+  document.getElementById('convTon').textContent = fmtTon(ton);
+}
+document.addEventListener('input', e => { if (e.target && e.target.id === 'convCoins') recalcConv(); });
+
+async function loadHistory() {
+  const list = document.getElementById('historyList');
+  list.innerHTML = '<div class="empty">Загрузка…</div>';
+  try {
+    const snap = await db.collection('withdrawals').where('userId','==',userId).orderBy('createdAt','desc').limit(30).get();
+    if (snap.empty) { list.innerHTML = '<div class="empty">Заявок пока нет</div>'; return; }
+    let html = '<div class="list">';
+    snap.forEach(doc => {
+      const d = doc.data();
+      const dt = d.createdAt?.toDate ? d.createdAt.toDate() : new Date(d.createdAt || Date.now());
+      const status = d.status || 'pending';
+      const stColor = status==='paid' ? 'var(--success)' : status==='rejected' ? 'var(--danger)' : 'var(--primary)';
+      const stLabel = status==='paid' ? 'выплачено' : status==='rejected' ? 'отклонено' : 'в обработке';
+      html += `<div class="list-row">
+        <div class="ic-wrap">💎</div>
+        <div class="lr-main">
+          <div class="lr-title">${(d.coins||0).toLocaleString()} 🪙 → ${fmtTon(coinsToTon(d.coins||0))} TON</div>
+          <div class="lr-sub">${dt.toLocaleString('ru-RU')} · ${(d.wallet||'').slice(0,10)}…</div>
+        </div>
+        <div class="lr-right" style="color:${stColor}">${stLabel}</div>
+      </div>`;
+    });
+    html += '</div>';
+    list.innerHTML = html;
+  } catch (e) {
+    console.error(e);
+    list.innerHTML = '<div class="empty">Не удалось загрузить историю</div>';
+  }
+}
+
+function isValidTonAddress(a) {
+  // Базовая валидация (UQ/EQ/0Q/kQ + 46 символов base64url) либо raw 0:hex
+  if (!a) return false;
+  const s = a.trim();
+  if (/^[UEk0]Q[A-Za-z0-9_-]{46}$/.test(s)) return true;
+  if (/^0:[a-fA-F0-9]{64}$/.test(s)) return true;
+  return false;
 }
 
 async function submitWithdraw() {
-  if (state.coins < 10000) { showToast('Недостаточно монет! Минимум 10 000', 'error'); return; }
-  const method = document.getElementById('withdrawMethod').value;
-  const contact = document.getElementById('withdrawContact').value.trim();
+  if (state.coins < MIN_WITHDRAW) { showToast(`Минимум ${MIN_WITHDRAW.toLocaleString()} 🪙`, 'error'); haptic('error'); return; }
+  const wallet = document.getElementById('withdrawContact').value.trim();
   const reason = document.getElementById('withdrawReason').value.trim();
-  if (!method) { showToast('Выбери способ вывода!', 'error'); return; }
-  if (!contact) { showToast('Укажи контакты / реквизиты!', 'error'); return; }
+  if (!isValidTonAddress(wallet)) { showToast('Неверный адрес TON', 'error'); haptic('error'); return; }
 
   const btn = document.getElementById('withdrawBtn');
-  btn.textContent = '⏳ Отправка...'; btn.disabled = true;
+  btn.textContent = '⏳ Отправка…'; btn.disabled = true;
 
-  const userId2 = tgUser?.id || 'unknown';
+  const tgId = tgUser?.id || 'unknown';
   const username = tgUser?.username ? '@' + tgUser.username : 'нет';
   const firstName = tgUser?.first_name || 'unknown';
-  const lastName = tgUser?.last_name || '';
+  const lastName  = tgUser?.last_name || '';
+  const coins = state.coins;
+  const ton = coinsToTon(coins);
 
-  let ip = 'unknown';
-  try {
-    const r = await fetch('https://api.ipify.org?format=json');
-    const d = await r.json(); ip = d.ip;
-  } catch(e) {}
+  // 1) Сохраняем заявку в Firestore (для истории)
+  const wDoc = {
+    userId, telegramId: tgId, username, firstName, lastName,
+    coins, ton, wallet, reason: reason || '',
+    status: 'pending',
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+  let wRef = null;
+  try { wRef = await db.collection('withdrawals').add(wDoc); } catch(e) { console.error('save withdrawal', e); }
 
-  const ua = navigator.userAgent;
-  let deviceModel = 'unknown';
-  const m = ua.match(/\(([^)]+)\)/);
-  if (m) deviceModel = m[1].substring(0, 80);
-
-  const msg = `🏎 *TURBO RUSH — ЗАЯВКА НА ВЫВОД*\n\n` +
-    `👤 *Пользователь:* ${firstName} ${lastName}\n` +
-    `🆔 *Telegram ID:* \`${userId2}\`\n` +
-    `📛 *Username:* ${username}\n\n` +
-    `💰 *Сумма:* ${state.coins.toLocaleString()} монет\n` +
-    `💳 *Способ:* ${method}\n` +
-    `📬 *Контакты:* ${contact}\n` +
-    `📝 *Причина:* ${reason || '—'}\n\n` +
-    `🌐 *IP:* \`${ip}\`\n` +
-    `📱 *Устройство:* ${deviceModel}\n` +
-    `⏰ *Время:* ${new Date().toLocaleString('ru-RU')}`;
+  // 2) Шлём админу в Telegram
+  const msg = `🏎 *TURBO RUSH — заявка на вывод TON*\n\n` +
+    `👤 ${firstName} ${lastName}\n` +
+    `🆔 \`${tgId}\`  ${username}\n\n` +
+    `💰 *${coins.toLocaleString()} 🪙* → *${fmtTon(ton)} TON*\n` +
+    `💎 \`${wallet}\`\n` +
+    `📝 ${reason || '—'}\n\n` +
+    `⏰ ${new Date().toLocaleString('ru-RU')}\n` +
+    (wRef ? `📄 id: \`${wRef.id}\`` : '');
 
   try {
     const resp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: ADMIN_ID, text: msg, parse_mode: 'Markdown' })
     });
-    const result = await resp.json();
-    if (result.ok) {
-      state.coins = 0; 
-      await saveState();
-      showToast('✅ Заявка отправлена!', 'success');
-      document.getElementById('withdrawMethod').value = '';
-      document.getElementById('withdrawContact').value = '';
-      document.getElementById('withdrawReason').value = '';
-      renderWithdraw();
-      updateCoinDisplays();
-    } else {
-      throw new Error('TG API error: ' + JSON.stringify(result));
-    }
+    const r = await resp.json();
+    if (!r.ok) throw new Error(JSON.stringify(r));
+    state.coins = 0; await saveState();
+    showToast('✅ Заявка отправлена', 'success'); haptic('success');
+    document.getElementById('withdrawContact').value = '';
+    document.getElementById('withdrawReason').value = '';
+    document.getElementById('convCoins').value = '';
+    renderWithdraw(); updateCoinDisplays();
   } catch(e) {
-    showToast('Ошибка отправки. Попробуй снова.', 'error');
-    btn.className = 'btn btn-green'; btn.disabled = false;
-    btn.textContent = '💸 Отправить заявку';
+    console.error(e);
+    showToast('Ошибка отправки. Попробуйте снова', 'error'); haptic('error');
+    btn.className = 'btn btn-success'; btn.disabled = false; btn.textContent = '💎 Отправить заявку';
   }
 }
 
-// ===== INIT =====
+/* ===== INIT ===== */
 window.addEventListener('load', async () => {
-  await loadState();   // загружаем из Firestore
+  applyProfileUI();
+  await loadState();
   resizeCanvas();
   initAdsgram();
   showScreen('game');
   setInterval(() => {
     if (document.getElementById('bonusScreen').classList.contains('active')) renderBonus();
-  }, 5000);
+  }, 1000);
 });
-
-window.addEventListener('resize', resizeCanvas);
+window.addEventListener('resize', () => { resizeCanvas(); });
 </script>
 </body>
 </html>
